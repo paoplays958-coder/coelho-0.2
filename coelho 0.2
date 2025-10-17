@@ -663,4 +663,20 @@ end)
 -- Atualizar character ao respawnar
 player.CharacterAdded:Connect(function(char)
     character = char
-    humanoid = character:WaitForChild("
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    
+    if flyEnabled then
+        stopFly()
+    end
+    if speedEnabled then
+        speedEnabled = false
+        speedBtn.Text = "Ativar Speed"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+    end
+    if jumpEnabled then
+        jumpEnabled = false
+        jumpBtn.Text = "Ativar Jump"
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+    end
+end)
