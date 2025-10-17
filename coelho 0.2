@@ -1,0 +1,666 @@
+-- Script Local Lua para Roblox
+-- Coelho Hub 0.1 - Sistema completo
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Variáveis de controle
+local flyEnabled = false
+local speedEnabled = false
+local jumpEnabled = false
+local speedValue = 16
+local jumpValue = 50
+local flySpeed = 50
+local minimized = false
+
+local bodyVelocity
+local bodyGyro
+local flyConnection
+
+-- Variáveis para arrastar
+local draggingWindow = false
+local dragInput
+local dragStart
+local startPos
+
+-- Criar UI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CoelhoHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Frame principal
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 400, 0, 450)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = false
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+-- Título
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, -100, 0, 50)
+title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+title.BorderSizePixel = 0
+title.Text = "Coelho Hub 0.1"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 24
+title.Font = Enum.Font.GothamBold
+title.Active = true
+title.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
+
+-- Botão Minimizar
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeButton"
+minimizeBtn.Size = UDim2.new(0, 45, 0, 45)
+minimizeBtn.Position = UDim2.new(1, -95, 0, 2.5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+minimizeBtn.TextSize = 28
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Parent = mainFrame
+
+local minimizeBtnCorner = Instance.new("UICorner")
+minimizeBtnCorner.CornerRadius = UDim.new(0, 8)
+minimizeBtnCorner.Parent = minimizeBtn
+
+-- Botão Fechar
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "CloseButton"
+closeBtn.Size = UDim2.new(0, 45, 0, 45)
+closeBtn.Position = UDim2.new(1, -47.5, 0, 2.5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
+closeBtn.BorderSizePixel = 0
+closeBtn.Text = "×"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 32
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = mainFrame
+
+local closeBtnCorner = Instance.new("UICorner")
+closeBtnCorner.CornerRadius = UDim.new(0, 8)
+closeBtnCorner.Parent = closeBtn
+
+-- Container de abas (LADO ESQUERDO)
+local tabContainer = Instance.new("Frame")
+tabContainer.Name = "TabContainer"
+tabContainer.Size = UDim2.new(0, 80, 1, -60)
+tabContainer.Position = UDim2.new(0, 10, 0, 60)
+tabContainer.BackgroundTransparency = 1
+tabContainer.Parent = mainFrame
+
+-- Botão aba Fly
+local flyTabBtn = Instance.new("TextButton")
+flyTabBtn.Name = "FlyTab"
+flyTabBtn.Size = UDim2.new(1, 0, 0, 35)
+flyTabBtn.Position = UDim2.new(0, 0, 0, 0)
+flyTabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+flyTabBtn.BorderSizePixel = 0
+flyTabBtn.Text = "Fly"
+flyTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTabBtn.TextSize = 16
+flyTabBtn.Font = Enum.Font.GothamBold
+flyTabBtn.Parent = tabContainer
+
+local flyTabCorner = Instance.new("UICorner")
+flyTabCorner.CornerRadius = UDim.new(0, 8)
+flyTabCorner.Parent = flyTabBtn
+
+-- Botão aba Speed
+local speedTabBtn = Instance.new("TextButton")
+speedTabBtn.Name = "SpeedTab"
+speedTabBtn.Size = UDim2.new(1, 0, 0, 35)
+speedTabBtn.Position = UDim2.new(0, 0, 0, 40)
+speedTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+speedTabBtn.BorderSizePixel = 0
+speedTabBtn.Text = "Speed"
+speedTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTabBtn.TextSize = 16
+speedTabBtn.Font = Enum.Font.GothamBold
+speedTabBtn.Parent = tabContainer
+
+local speedTabCorner = Instance.new("UICorner")
+speedTabCorner.CornerRadius = UDim.new(0, 8)
+speedTabCorner.Parent = speedTabBtn
+
+-- Botão aba Jump
+local jumpTabBtn = Instance.new("TextButton")
+jumpTabBtn.Name = "JumpTab"
+jumpTabBtn.Size = UDim2.new(1, 0, 0, 35)
+jumpTabBtn.Position = UDim2.new(0, 0, 0, 80)
+jumpTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+jumpTabBtn.BorderSizePixel = 0
+jumpTabBtn.Text = "Jump"
+jumpTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+jumpTabBtn.TextSize = 16
+jumpTabBtn.Font = Enum.Font.GothamBold
+jumpTabBtn.Parent = tabContainer
+
+local jumpTabCorner = Instance.new("UICorner")
+jumpTabCorner.CornerRadius = UDim.new(0, 8)
+jumpTabCorner.Parent = jumpTabBtn
+
+-- Container de conteúdo
+local contentContainer = Instance.new("Frame")
+contentContainer.Name = "ContentContainer"
+contentContainer.Size = UDim2.new(1, -110, 1, -70)
+contentContainer.Position = UDim2.new(0, 100, 0, 60)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+-- Frame Fly
+local flyFrame = Instance.new("Frame")
+flyFrame.Name = "FlyFrame"
+flyFrame.Size = UDim2.new(1, 0, 1, 0)
+flyFrame.BackgroundTransparency = 1
+flyFrame.Visible = true
+flyFrame.Parent = contentContainer
+
+local flyBtn = Instance.new("TextButton")
+flyBtn.Name = "FlyButton"
+flyBtn.Size = UDim2.new(0, 200, 0, 60)
+flyBtn.Position = UDim2.new(0.5, -100, 0.3, -30)
+flyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+flyBtn.BorderSizePixel = 0
+flyBtn.Text = "Ativar Fly"
+flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBtn.TextSize = 20
+flyBtn.Font = Enum.Font.GothamBold
+flyBtn.Parent = flyFrame
+
+local flyBtnCorner = Instance.new("UICorner")
+flyBtnCorner.CornerRadius = UDim.new(0, 10)
+flyBtnCorner.Parent = flyBtn
+
+local flyInstructions = Instance.new("TextLabel")
+flyInstructions.Size = UDim2.new(1, -20, 0, 100)
+flyInstructions.Position = UDim2.new(0, 10, 0.5, 0)
+flyInstructions.BackgroundTransparency = 1
+flyInstructions.Text = "Controles:\nW/A/S/D - Mover\nEspaço - Subir\nShift - Descer"
+flyInstructions.TextColor3 = Color3.fromRGB(200, 200, 200)
+flyInstructions.TextSize = 16
+flyInstructions.Font = Enum.Font.Gotham
+flyInstructions.TextWrapped = true
+flyInstructions.Parent = flyFrame
+
+-- Frame Speed
+local speedFrame = Instance.new("Frame")
+speedFrame.Name = "SpeedFrame"
+speedFrame.Size = UDim2.new(1, 0, 1, 0)
+speedFrame.BackgroundTransparency = 1
+speedFrame.Visible = false
+speedFrame.Parent = contentContainer
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -20, 0, 40)
+speedLabel.Position = UDim2.new(0, 10, 0, 20)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "Velocidade: 16"
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.TextSize = 18
+speedLabel.Font = Enum.Font.GothamBold
+speedLabel.Parent = speedFrame
+
+local speedSliderBg = Instance.new("Frame")
+speedSliderBg.Name = "SpeedSliderBg"
+speedSliderBg.Size = UDim2.new(1, -20, 0, 30)
+speedSliderBg.Position = UDim2.new(0, 10, 0, 70)
+speedSliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+speedSliderBg.BorderSizePixel = 0
+speedSliderBg.Parent = speedFrame
+
+local speedSliderBgCorner = Instance.new("UICorner")
+speedSliderBgCorner.CornerRadius = UDim.new(0, 8)
+speedSliderBgCorner.Parent = speedSliderBg
+
+local speedSliderFill = Instance.new("Frame")
+speedSliderFill.Name = "SpeedSliderFill"
+speedSliderFill.Size = UDim2.new(0.16, 0, 1, 0)
+speedSliderFill.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+speedSliderFill.BorderSizePixel = 0
+speedSliderFill.Parent = speedSliderBg
+
+local speedSliderFillCorner = Instance.new("UICorner")
+speedSliderFillCorner.CornerRadius = UDim.new(0, 8)
+speedSliderFillCorner.Parent = speedSliderFill
+
+local speedSliderBtn = Instance.new("TextButton")
+speedSliderBtn.Name = "SpeedSliderBtn"
+speedSliderBtn.Size = UDim2.new(1, 0, 1, 0)
+speedSliderBtn.BackgroundTransparency = 1
+speedSliderBtn.Text = ""
+speedSliderBtn.ZIndex = 5
+speedSliderBtn.Parent = speedSliderBg
+
+local speedBtn = Instance.new("TextButton")
+speedBtn.Name = "SpeedButton"
+speedBtn.Size = UDim2.new(0, 200, 0, 60)
+speedBtn.Position = UDim2.new(0.5, -100, 0, 130)
+speedBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+speedBtn.BorderSizePixel = 0
+speedBtn.Text = "Ativar Speed"
+speedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBtn.TextSize = 20
+speedBtn.Font = Enum.Font.GothamBold
+speedBtn.Parent = speedFrame
+
+local speedBtnCorner = Instance.new("UICorner")
+speedBtnCorner.CornerRadius = UDim.new(0, 10)
+speedBtnCorner.Parent = speedBtn
+
+-- Frame Jump
+local jumpFrame = Instance.new("Frame")
+jumpFrame.Name = "JumpFrame"
+jumpFrame.Size = UDim2.new(1, 0, 1, 0)
+jumpFrame.BackgroundTransparency = 1
+jumpFrame.Visible = false
+jumpFrame.Parent = contentContainer
+
+local jumpLabel = Instance.new("TextLabel")
+jumpLabel.Size = UDim2.new(1, -20, 0, 40)
+jumpLabel.Position = UDim2.new(0, 10, 0, 20)
+jumpLabel.BackgroundTransparency = 1
+jumpLabel.Text = "Força do Pulo: 50"
+jumpLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+jumpLabel.TextSize = 18
+jumpLabel.Font = Enum.Font.GothamBold
+jumpLabel.Parent = jumpFrame
+
+local jumpSliderBg = Instance.new("Frame")
+jumpSliderBg.Name = "JumpSliderBg"
+jumpSliderBg.Size = UDim2.new(1, -20, 0, 30)
+jumpSliderBg.Position = UDim2.new(0, 10, 0, 70)
+jumpSliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+jumpSliderBg.BorderSizePixel = 0
+jumpSliderBg.Parent = jumpFrame
+
+local jumpSliderBgCorner = Instance.new("UICorner")
+jumpSliderBgCorner.CornerRadius = UDim.new(0, 8)
+jumpSliderBgCorner.Parent = jumpSliderBg
+
+local jumpSliderFill = Instance.new("Frame")
+jumpSliderFill.Name = "JumpSliderFill"
+jumpSliderFill.Size = UDim2.new(0.5, 0, 1, 0)
+jumpSliderFill.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+jumpSliderFill.BorderSizePixel = 0
+jumpSliderFill.Parent = jumpSliderBg
+
+local jumpSliderFillCorner = Instance.new("UICorner")
+jumpSliderFillCorner.CornerRadius = UDim.new(0, 8)
+jumpSliderFillCorner.Parent = jumpSliderFill
+
+local jumpSliderBtn = Instance.new("TextButton")
+jumpSliderBtn.Name = "JumpSliderBtn"
+jumpSliderBtn.Size = UDim2.new(1, 0, 1, 0)
+jumpSliderBtn.BackgroundTransparency = 1
+jumpSliderBtn.Text = ""
+jumpSliderBtn.ZIndex = 5
+jumpSliderBtn.Parent = jumpSliderBg
+
+local jumpBtn = Instance.new("TextButton")
+jumpBtn.Name = "JumpButton"
+jumpBtn.Size = UDim2.new(0, 200, 0, 60)
+jumpBtn.Position = UDim2.new(0.5, -100, 0, 130)
+jumpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+jumpBtn.BorderSizePixel = 0
+jumpBtn.Text = "Ativar Jump"
+jumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+jumpBtn.TextSize = 20
+jumpBtn.Font = Enum.Font.GothamBold
+jumpBtn.Parent = jumpFrame
+
+local jumpBtnCorner = Instance.new("UICorner")
+jumpBtnCorner.CornerRadius = UDim.new(0, 10)
+jumpBtnCorner.Parent = jumpBtn
+
+-- Funções Fly
+local function startFly()
+    flyEnabled = true
+    flyBtn.Text = "Desativar Fly"
+    flyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
+    humanoid:ChangeState(Enum.HumanoidStateType.Flying)
+    
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 9e4
+    bodyGyro.CFrame = rootPart.CFrame
+    bodyGyro.Parent = rootPart
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local camera = workspace.CurrentCamera
+        local moveDirection = Vector3.new(0, 0, 0)
+        local speed = flySpeed
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+        
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit
+        end
+        
+        bodyVelocity.Velocity = moveDirection * speed
+        bodyGyro.CFrame = camera.CFrame
+        rootPart.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
+    end)
+end
+
+local function stopFly()
+    flyEnabled = false
+    flyBtn.Text = "Ativar Fly"
+    flyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+    
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+    humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+    
+    if flyConnection then
+        flyConnection:Disconnect()
+    end
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+    end
+end
+
+-- Funções Speed
+local function updateSpeed()
+    if speedEnabled then
+        humanoid.WalkSpeed = speedValue
+    end
+end
+
+-- Funções Jump
+local function updateJump()
+    if jumpEnabled then
+        humanoid.JumpPower = jumpValue
+    end
+end
+
+-- Eventos das abas
+flyTabBtn.MouseButton1Click:Connect(function()
+    flyFrame.Visible = true
+    speedFrame.Visible = false
+    jumpFrame.Visible = false
+    flyTabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+    speedTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    jumpTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+end)
+
+speedTabBtn.MouseButton1Click:Connect(function()
+    flyFrame.Visible = false
+    speedFrame.Visible = true
+    jumpFrame.Visible = false
+    flyTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    speedTabBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+    jumpTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+end)
+
+jumpTabBtn.MouseButton1Click:Connect(function()
+    flyFrame.Visible = false
+    speedFrame.Visible = false
+    jumpFrame.Visible = true
+    flyTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    speedTabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    jumpTabBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 200)
+end)
+
+-- Evento botão Fly
+flyBtn.MouseButton1Click:Connect(function()
+    if flyEnabled then
+        stopFly()
+    else
+        startFly()
+    end
+end)
+
+-- Sistema de slider para Speed
+local speedDragging = false
+local speedDragConnection = nil
+
+local function updateSpeedSlider(inputPosition)
+    local sliderPos = speedSliderBg.AbsolutePosition
+    local sliderSize = speedSliderBg.AbsoluteSize
+    
+    local relativeX = math.clamp(inputPosition.X - sliderPos.X, 0, sliderSize.X)
+    local percent = relativeX / sliderSize.X
+    
+    speedValue = math.floor(percent * 100)
+    speedSliderFill.Size = UDim2.new(percent, 0, 1, 0)
+    speedLabel.Text = "Velocidade: " .. speedValue
+    
+    updateSpeed()
+end
+
+speedSliderBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        speedDragging = true
+        
+        speedDragConnection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                speedDragging = false
+                if speedDragConnection then
+                    speedDragConnection:Disconnect()
+                    speedDragConnection = nil
+                end
+            end
+        end)
+        
+        updateSpeedSlider(input.Position)
+    end
+end)
+
+speedSliderBtn.InputChanged:Connect(function(input)
+    if speedDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSpeedSlider(input.Position)
+    end
+end)
+
+-- Sistema de slider para Jump
+local jumpDragging = false
+local jumpDragConnection = nil
+
+local function updateJumpSlider(inputPosition)
+    local sliderPos = jumpSliderBg.AbsolutePosition
+    local sliderSize = jumpSliderBg.AbsoluteSize
+    
+    local relativeX = math.clamp(inputPosition.X - sliderPos.X, 0, sliderSize.X)
+    local percent = relativeX / sliderSize.X
+    
+    jumpValue = math.floor(percent * 100)
+    jumpSliderFill.Size = UDim2.new(percent, 0, 1, 0)
+    jumpLabel.Text = "Força do Pulo: " .. jumpValue
+    
+    updateJump()
+end
+
+jumpSliderBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        jumpDragging = true
+        
+        jumpDragConnection = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                jumpDragging = false
+                if jumpDragConnection then
+                    jumpDragConnection:Disconnect()
+                    jumpDragConnection = nil
+                end
+            end
+        end)
+        
+        updateJumpSlider(input.Position)
+    end
+end)
+
+jumpSliderBtn.InputChanged:Connect(function(input)
+    if jumpDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateJumpSlider(input.Position)
+    end
+end)
+
+-- Evento botão Speed
+speedBtn.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    
+    if speedEnabled then
+        speedBtn.Text = "Desativar Speed"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        humanoid.WalkSpeed = speedValue
+    else
+        speedBtn.Text = "Ativar Speed"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+        humanoid.WalkSpeed = 16
+    end
+end)
+
+-- Evento botão Jump
+jumpBtn.MouseButton1Click:Connect(function()
+    jumpEnabled = not jumpEnabled
+    
+    if jumpEnabled then
+        jumpBtn.Text = "Desativar Jump"
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        humanoid.JumpPower = jumpValue
+    else
+        jumpBtn.Text = "Ativar Jump"
+        jumpBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+        humanoid.JumpPower = 50
+    end
+end)
+
+-- Sistema de arrastar janela melhorado
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingWindow = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        dragInput = input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                draggingWindow = false
+                if dragInput then
+                    dragInput:Disconnect()
+                    dragInput = nil
+                end
+            end
+        end)
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if draggingWindow and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateDrag(input)
+    end
+end)
+
+-- Evento botão Minimizar
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    
+    if minimized then
+        mainFrame:TweenSize(
+            UDim2.new(0, 400, 0, 50),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.3,
+            true
+        )
+        minimizeBtn.Text = "□"
+    else
+        mainFrame:TweenSize(
+            UDim2.new(0, 400, 0, 450),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.3,
+            true
+        )
+        minimizeBtn.Text = "−"
+    end
+end)
+
+-- Evento botão Fechar
+closeBtn.MouseButton1Click:Connect(function()
+    if flyEnabled then
+        stopFly()
+    end
+    screenGui:Destroy()
+end)
+
+-- Atualizar character ao respawnar
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid = character:WaitForChild("
